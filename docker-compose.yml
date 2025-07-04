@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: amantena-db
+    environment:
+      POSTGRES_DB: amantena_farms
+      POSTGRES_USER: amantena_user
+      POSTGRES_PASSWORD: amantena_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - amantena-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amantena_user -d amantena_farms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: amantena-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://amantena_user:amantena_password@database:5432/amantena_farms
+      SESSION_SECRET: your-super-secret-session-key-change-this-in-production
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      FRONTEND_URL: http://localhost:3000
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - amantena-network
+    volumes:
+      - ./backend/uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:5000/api
+        REACT_APP_SOCKET_URL: http://localhost:5000
+    container_name: amantena-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - amantena-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis for session storage (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: amantena-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - amantena-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  amantena-network:
+    driver: bridge

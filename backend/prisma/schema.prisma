@@ -1,0 +1,213 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  isActive     Boolean  @default(true) @map("is_active")
+
+  // Relations
+  sales        Sale[]
+  invitesSent  Invite[] @relation("InvitedBy")
+  events       CalendarEvent[]
+  projects     Project[]
+  tasks        Task[]
+
+  @@map("users")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  quantity    Int
+  imageUrl    String?  @map("image_url")
+  threshold   Int      @default(10) // Low stock alert threshold
+  sku         String?  @unique // Stock Keeping Unit
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  // Relations
+  sales Sale[]
+
+  @@map("products")
+}
+
+model Sale {
+  id           String   @id @default(cuid())
+  productId    String   @map("product_id")
+  quantitySold Int      @map("quantity_sold")
+  unitPrice    Decimal  @db.Decimal(10, 2) @map("unit_price")
+  totalAmount  Decimal  @db.Decimal(10, 2) @map("total_amount")
+  soldAt       DateTime @default(now()) @map("sold_at")
+  userId       String   @map("user_id")
+  notes        String?
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("sales")
+}
+
+model Invite {
+  id        String      @id @default(cuid())
+  email     String
+  token     String      @unique
+  status    InviteStatus @default(PENDING)
+  invitedBy String      @map("invited_by")
+  role      Role        @default(STAFF)
+  createdAt DateTime    @default(now()) @map("created_at")
+  expiresAt DateTime    @map("expires_at")
+
+  // Relations
+  inviter User @relation("InvitedBy", fields: [invitedBy], references: [id])
+
+  @@map("invites")
+}
+
+model Album {
+  id        String   @id @default(cuid())
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  images Image[]
+
+  @@map("albums")
+}
+
+model Image {
+  id          String   @id @default(cuid())
+  albumId     String   @map("album_id")
+  url         String
+  publicId    String   @map("public_id") // Cloudinary public ID
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@map("images")
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  date        DateTime
+  type        EventType @default(GENERAL)
+  description String?
+  userId      String    @map("user_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("calendar_events")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  startDate   DateTime?     @map("start_date")
+  endDate     DateTime?     @map("end_date")
+  userId      String        @map("user_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id])
+  tasks Task[]
+
+  @@map("projects")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  projectId   String?    @map("project_id")
+  assignedTo  String?    @map("assigned_to")
+  dueDate     DateTime?  @map("due_date")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?    @relation(fields: [assignedTo], references: [id])
+
+  @@map("tasks")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum EventType {
+  MEETING
+  HARVEST
+  PLANTING
+  MAINTENANCE
+  GENERAL
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Session model for express-session store
+model Session {
+  id        String   @id
+  sid       String   @unique
+  data      String
+  expiresAt DateTime
+  
+  @@map("sessions")
+}
