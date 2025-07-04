@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
 import App from './App';
+import initSentry from './utils/sentry';
+
+// Initialize Sentry for error monitoring
+initSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {

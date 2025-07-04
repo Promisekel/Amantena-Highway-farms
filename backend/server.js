@@ -11,6 +11,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+// Initialize Sentry (must be before other imports)
+const { initSentry, sentryRequestHandler, sentryTracingHandler, sentryErrorHandler } = require('./config/sentry');
+initSentry();
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -50,6 +54,10 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan('combined'));
 app.use(limiter);
+
+// Sentry request and tracing handlers (must be first)
+app.use(sentryRequestHandler());
+app.use(sentryTracingHandler());
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -125,6 +133,7 @@ app.use('/api/projects', authMiddleware.requireAuth, projectRoutes);
 app.use('/api/upload', authMiddleware.requireAuth, uploadRoutes);
 
 // Error handling
+app.use(sentryErrorHandler()); // Sentry error handler must be before other error handlers
 app.use(errorHandler);
 
 // 404 handler

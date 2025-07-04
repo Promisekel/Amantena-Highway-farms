@@ -1,0 +1,28 @@
+# Railway.app Deployment Configuration
+# This file configures the Railway deployment for the backend
+
+[build]
+  builder = "NIXPACKS"
+
+[deploy]
+  startCommand = "npm start"
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 3
+
+[environments.production]
+  variables = [
+    { name = "NODE_ENV", value = "production" },
+    { name = "PORT", value = "5000" }
+  ]
+
+# Health check configuration
+[healthCheck]
+  path = "/health"
+  timeoutSeconds = 30
+  intervalSeconds = 60
+
+# Service configuration
+[service]
+  name = "amantena-backend"
+  type = "web"
+  port = 5000
